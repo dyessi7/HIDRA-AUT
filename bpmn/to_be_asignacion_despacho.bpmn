@@ -1,0 +1,378 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+                  xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+                  xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  id="Definitions_ToBe_CCO_Agentes"
+                  targetNamespace="http://hidrandina.com.pe/bpmn/tobe">
+
+  <bpmn:collaboration id="Collaboration_CCO">
+    <bpmn:participant id="Participant_Hidrandina" name="Hidrandina S.A. - Unidad de Negocios Trujillo" processRef="Process_ToBe_CCO" />
+  </bpmn:collaboration>
+
+  <bpmn:process id="Process_ToBe_CCO" name="Asignación y despacho de cuadrilla (TO-BE multiagéntico)" isExecutable="false">
+    <bpmn:documentation>TO-BE del subproceso del Centro de Control de Operaciones, modelado con un carril por agente para reflejar fielmente la arquitectura multiagéntica implementada en n8n. Orquestador (AI Agent con memoria conversacional Session ID = codigo_aviso) coordina tres subagentes especializados: AnalistaDeFalla, CoordinadorDeCuadrillas y EmisorDeOrden, cada uno con su propio modelo Claude Sonnet 4.5 y sus herramientas de acceso a base de datos. Las tareas de envío y recepción de mensaje modelan las llamadas explícitas del orquestador a cada subagente y las respuestas de vuelta.</bpmn:documentation>
+
+    <bpmn:laneSet id="LaneSet_1">
+      <bpmn:lane id="Lane_Orq" name="Orquestador (AI Agent con memoria)">
+        <bpmn:flowNodeRef>S_Caso</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>T_SolicAnalisis</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>T_SolicCoord</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>GW_Disp</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>T_Verificar</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>GW_Vigente</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>T_SolicEmision</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>T_NotificarCuad</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>E_Despachada</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>E_Cerrado</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_Analista" name="AnalistaDeFalla (Claude Sonnet 4.5)">
+        <bpmn:flowNodeRef>T_Ana_Recibir</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>T_Ana_Procesar</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>T_Ana_Enviar</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_Coord" name="CoordinadorDeCuadrillas (Claude Sonnet 4.5)">
+        <bpmn:flowNodeRef>T_Coord_Recibir</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>T_Coord_Procesar</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>T_Coord_Enviar</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_Emisor" name="EmisorDeOrden (Claude Sonnet 4.5)">
+        <bpmn:flowNodeRef>T_Emisor_Recibir</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>T_Emisor_Procesar</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>T_Emisor_Enviar</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_Sup" name="Supervisor CCO">
+        <bpmn:flowNodeRef>SP_Contingencia</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>E_Pendiente</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+
+    <bpmn:startEvent id="S_Caso" name="Caso listo para despacho">
+      <bpmn:documentation>Entrada del subproceso. Recibe por webhook POST /despacho el caso proveniente del subproceso anterior (Recepción y clasificación en Fonoservicio). Payload: codigo_aviso, zona, tipo_falla, prioridad.</bpmn:documentation>
+      <bpmn:outgoing>F01</bpmn:outgoing>
+    </bpmn:startEvent>
+
+    <bpmn:sendTask id="T_SolicAnalisis" name="Solicitar análisis de falla">
+      <bpmn:documentation>El orquestador invoca al subagente AnalistaDeFalla pasándole la zona del caso. Corresponde a la llamada al AI Agent Tool "AnalistaDeFalla" desde el orquestador en n8n.</bpmn:documentation>
+      <bpmn:incoming>F01</bpmn:incoming>
+      <bpmn:outgoing>F02</bpmn:outgoing>
+    </bpmn:sendTask>
+
+    <bpmn:receiveTask id="T_Ana_Recibir" name="Recibir solicitud de análisis">
+      <bpmn:documentation>El subagente AnalistaDeFalla recibe la zona del caso y el contexto necesario para iniciar el análisis.</bpmn:documentation>
+      <bpmn:incoming>F02</bpmn:incoming>
+      <bpmn:outgoing>F03</bpmn:outgoing>
+    </bpmn:receiveTask>
+
+    <bpmn:serviceTask id="T_Ana_Procesar" name="Consultar avisos y agrupar por similitud">
+      <bpmn:documentation>El AnalistaDeFalla consulta el registro de incidencias abiertas en la zona (herramienta ConsultarAvisos), agrupa los que corresponden a la misma falla por similitud de dirección y descripción, e identifica el tipo de falla predominante. Reemplaza "Ubicar el punto de falla" del AS-IS.</bpmn:documentation>
+      <bpmn:incoming>F03</bpmn:incoming>
+      <bpmn:outgoing>F04</bpmn:outgoing>
+      <bpmn:property id="Prop_Ana" name="__targetRef_placeholder" />
+      <bpmn:dataInputAssociation id="DIA_Ana">
+        <bpmn:sourceRef>DS_Avisos</bpmn:sourceRef>
+        <bpmn:targetRef>Prop_Ana</bpmn:targetRef>
+      </bpmn:dataInputAssociation>
+    </bpmn:serviceTask>
+
+    <bpmn:sendTask id="T_Ana_Enviar" name="Enviar análisis al orquestador">
+      <bpmn:documentation>El AnalistaDeFalla devuelve al orquestador el reporte estructurado: avisos agrupados, tipo de falla predominante, cantidad de clientes afectados.</bpmn:documentation>
+      <bpmn:incoming>F04</bpmn:incoming>
+      <bpmn:outgoing>F05</bpmn:outgoing>
+    </bpmn:sendTask>
+
+    <bpmn:sendTask id="T_SolicCoord" name="Solicitar coordinación de cuadrilla">
+      <bpmn:documentation>El orquestador, con el análisis recibido, invoca al subagente CoordinadorDeCuadrillas pasándole el tipo de falla y la zona.</bpmn:documentation>
+      <bpmn:incoming>F05</bpmn:incoming>
+      <bpmn:outgoing>F06</bpmn:outgoing>
+    </bpmn:sendTask>
+
+    <bpmn:receiveTask id="T_Coord_Recibir" name="Recibir solicitud de coordinación">
+      <bpmn:documentation>El CoordinadorDeCuadrillas recibe el tipo de falla y la zona para iniciar la búsqueda de cuadrilla.</bpmn:documentation>
+      <bpmn:incoming>F06</bpmn:incoming>
+      <bpmn:outgoing>F07</bpmn:outgoing>
+    </bpmn:receiveTask>
+
+    <bpmn:serviceTask id="T_Coord_Procesar" name="Consultar cuadrillas y rankear candidatas">
+      <bpmn:documentation>El CoordinadorDeCuadrillas consulta el registro de disponibilidad (herramienta ConsultarCuadrillas) filtrando por especialidad y estado libre, prioriza las de misma zona base, y devuelve la mejor candidata. Reemplaza las cuatro tareas fusionadas del AS-IS: llamar por radio, responder, ¿hay cuadrilla libre?, elegir.</bpmn:documentation>
+      <bpmn:incoming>F07</bpmn:incoming>
+      <bpmn:outgoing>F08</bpmn:outgoing>
+      <bpmn:property id="Prop_Coord" name="__targetRef_placeholder" />
+      <bpmn:dataInputAssociation id="DIA_Coord">
+        <bpmn:sourceRef>DS_Cuadrillas</bpmn:sourceRef>
+        <bpmn:targetRef>Prop_Coord</bpmn:targetRef>
+      </bpmn:dataInputAssociation>
+    </bpmn:serviceTask>
+
+    <bpmn:sendTask id="T_Coord_Enviar" name="Enviar recomendación al orquestador">
+      <bpmn:documentation>El CoordinadorDeCuadrillas devuelve al orquestador la cuadrilla recomendada o indica "sin disponibilidad" si no hay ninguna libre con la especialidad requerida.</bpmn:documentation>
+      <bpmn:incoming>F08</bpmn:incoming>
+      <bpmn:outgoing>F09</bpmn:outgoing>
+    </bpmn:sendTask>
+
+    <bpmn:exclusiveGateway id="GW_Disp" name="¿Hay cuadrilla disponible?">
+      <bpmn:incoming>F09</bpmn:incoming>
+      <bpmn:outgoing>F10</bpmn:outgoing>
+      <bpmn:outgoing>F20</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+
+    <bpmn:serviceTask id="T_Verificar" name="Verificar vigencia del caso">
+      <bpmn:documentation>El orquestador consulta el estado actual del aviso antes de proceder a la emisión. Si el cliente canceló entre el ingreso a la cola y este punto, se aborta el ciclo. Pieza nueva del TO-BE: en el AS-IS la cancelación tardía se descubría cuando la cuadrilla llegaba al lugar.</bpmn:documentation>
+      <bpmn:incoming>F10</bpmn:incoming>
+      <bpmn:outgoing>F11</bpmn:outgoing>
+      <bpmn:property id="Prop_Ver" name="__targetRef_placeholder" />
+      <bpmn:dataInputAssociation id="DIA_Ver">
+        <bpmn:sourceRef>DS_Avisos</bpmn:sourceRef>
+        <bpmn:targetRef>Prop_Ver</bpmn:targetRef>
+      </bpmn:dataInputAssociation>
+    </bpmn:serviceTask>
+
+    <bpmn:exclusiveGateway id="GW_Vigente" name="¿Caso sigue vigente?">
+      <bpmn:incoming>F11</bpmn:incoming>
+      <bpmn:outgoing>F12</bpmn:outgoing>
+      <bpmn:outgoing>F21</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+
+    <bpmn:sendTask id="T_SolicEmision" name="Solicitar emisión de orden">
+      <bpmn:documentation>El orquestador invoca al subagente EmisorDeOrden pasándole codigo_aviso, codigo_cuadrilla y prioridad.</bpmn:documentation>
+      <bpmn:incoming>F12</bpmn:incoming>
+      <bpmn:outgoing>F13</bpmn:outgoing>
+    </bpmn:sendTask>
+
+    <bpmn:receiveTask id="T_Emisor_Recibir" name="Recibir solicitud de emisión">
+      <bpmn:documentation>El EmisorDeOrden recibe los datos necesarios para generar y persistir la orden de trabajo.</bpmn:documentation>
+      <bpmn:incoming>F13</bpmn:incoming>
+      <bpmn:outgoing>F14</bpmn:outgoing>
+    </bpmn:receiveTask>
+
+    <bpmn:serviceTask id="T_Emisor_Procesar" name="Generar código y persistir orden">
+      <bpmn:documentation>El EmisorDeOrden genera código único OT-2026-XXXX y persiste la orden en el registro de órdenes (herramienta RegistrarOrden, operación Create). Elimina la doble anotación del AS-IS: la orden vive solo en base de datos.</bpmn:documentation>
+      <bpmn:incoming>F14</bpmn:incoming>
+      <bpmn:outgoing>F15</bpmn:outgoing>
+      <bpmn:property id="Prop_Em" name="__targetRef_placeholder" />
+      <bpmn:dataOutputAssociation id="DOA_Em">
+        <bpmn:targetRef>DS_Ordenes</bpmn:targetRef>
+      </bpmn:dataOutputAssociation>
+    </bpmn:serviceTask>
+
+    <bpmn:sendTask id="T_Emisor_Enviar" name="Confirmar orden emitida">
+      <bpmn:documentation>El EmisorDeOrden devuelve al orquestador el código de la orden emitida y el estado de registro exitoso.</bpmn:documentation>
+      <bpmn:incoming>F15</bpmn:incoming>
+      <bpmn:outgoing>F16</bpmn:outgoing>
+    </bpmn:sendTask>
+
+    <bpmn:sendTask id="T_NotificarCuad" name="Notificar orden a la cuadrilla asignada">
+      <bpmn:documentation>El orquestador envía la orden a la cuadrilla por canal digital directo. Reemplaza el despacho por radio del AS-IS, eliminando los timers de "Sin confirmar 30 min" y el escalamiento al supervisor por silencio de radio.</bpmn:documentation>
+      <bpmn:incoming>F16</bpmn:incoming>
+      <bpmn:outgoing>F17</bpmn:outgoing>
+    </bpmn:sendTask>
+
+    <bpmn:endEvent id="E_Despachada" name="Cuadrilla despachada (HTTP 201)">
+      <bpmn:documentation>Resultado exitoso del subproceso. Handoff con la ejecución en terreno (fuera del alcance de la automatización).</bpmn:documentation>
+      <bpmn:incoming>F17</bpmn:incoming>
+    </bpmn:endEvent>
+
+    <bpmn:endEvent id="E_Cerrado" name="Caso cerrado por cancelación (HTTP 200)">
+      <bpmn:documentation>El cliente canceló el aviso antes de la emisión. Se cierra sin despacho, sin consumo de recursos de cuadrilla.</bpmn:documentation>
+      <bpmn:incoming>F21</bpmn:incoming>
+    </bpmn:endEvent>
+
+    <bpmn:subProcess id="SP_Contingencia" name="Gestionar contingencia manual">
+      <bpmn:documentation>Subproceso ejecutado por el supervisor humano cuando no hay cuadrilla disponible. Actividades típicas (no automatizadas): activar plan de contingencia, coordinar con otra zonal, autorizar hora extra, contactar contratistas. Fuera del alcance de la automatización multiagéntica del TO-BE actual.</bpmn:documentation>
+      <bpmn:incoming>F20</bpmn:incoming>
+      <bpmn:outgoing>F22</bpmn:outgoing>
+    </bpmn:subProcess>
+
+    <bpmn:endEvent id="E_Pendiente" name="Caso pendiente por contingencia (HTTP 202)">
+      <bpmn:incoming>F22</bpmn:incoming>
+    </bpmn:endEvent>
+
+    <bpmn:dataStoreReference id="DS_Avisos" name="Registro de incidencias" />
+    <bpmn:dataStoreReference id="DS_Cuadrillas" name="Registro de disponibilidad de cuadrillas" />
+    <bpmn:dataStoreReference id="DS_Ordenes" name="Registro de órdenes de trabajo" />
+
+    <bpmn:sequenceFlow id="F01" sourceRef="S_Caso" targetRef="T_SolicAnalisis" />
+    <bpmn:sequenceFlow id="F02" sourceRef="T_SolicAnalisis" targetRef="T_Ana_Recibir" />
+    <bpmn:sequenceFlow id="F03" sourceRef="T_Ana_Recibir" targetRef="T_Ana_Procesar" />
+    <bpmn:sequenceFlow id="F04" sourceRef="T_Ana_Procesar" targetRef="T_Ana_Enviar" />
+    <bpmn:sequenceFlow id="F05" sourceRef="T_Ana_Enviar" targetRef="T_SolicCoord" />
+    <bpmn:sequenceFlow id="F06" sourceRef="T_SolicCoord" targetRef="T_Coord_Recibir" />
+    <bpmn:sequenceFlow id="F07" sourceRef="T_Coord_Recibir" targetRef="T_Coord_Procesar" />
+    <bpmn:sequenceFlow id="F08" sourceRef="T_Coord_Procesar" targetRef="T_Coord_Enviar" />
+    <bpmn:sequenceFlow id="F09" sourceRef="T_Coord_Enviar" targetRef="GW_Disp" />
+    <bpmn:sequenceFlow id="F10" sourceRef="GW_Disp" targetRef="T_Verificar" name="Sí" />
+    <bpmn:sequenceFlow id="F11" sourceRef="T_Verificar" targetRef="GW_Vigente" />
+    <bpmn:sequenceFlow id="F12" sourceRef="GW_Vigente" targetRef="T_SolicEmision" name="Sí" />
+    <bpmn:sequenceFlow id="F13" sourceRef="T_SolicEmision" targetRef="T_Emisor_Recibir" />
+    <bpmn:sequenceFlow id="F14" sourceRef="T_Emisor_Recibir" targetRef="T_Emisor_Procesar" />
+    <bpmn:sequenceFlow id="F15" sourceRef="T_Emisor_Procesar" targetRef="T_Emisor_Enviar" />
+    <bpmn:sequenceFlow id="F16" sourceRef="T_Emisor_Enviar" targetRef="T_NotificarCuad" />
+    <bpmn:sequenceFlow id="F17" sourceRef="T_NotificarCuad" targetRef="E_Despachada" />
+    <bpmn:sequenceFlow id="F20" sourceRef="GW_Disp" targetRef="SP_Contingencia" name="No · sin disponibilidad" />
+    <bpmn:sequenceFlow id="F21" sourceRef="GW_Vigente" targetRef="E_Cerrado" name="No · cancelado" />
+    <bpmn:sequenceFlow id="F22" sourceRef="SP_Contingencia" targetRef="E_Pendiente" />
+  </bpmn:process>
+
+  <bpmndi:BPMNDiagram id="Diagram_1">
+    <bpmndi:BPMNPlane id="Plane_1" bpmnElement="Collaboration_CCO">
+
+      <bpmndi:BPMNShape id="Shape_Participant" bpmnElement="Participant_Hidrandina" isHorizontal="true">
+        <dc:Bounds x="100" y="80" width="2000" height="1050" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Shape_Lane_Orq" bpmnElement="Lane_Orq" isHorizontal="true">
+        <dc:Bounds x="130" y="80" width="1970" height="280" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Shape_Lane_Ana" bpmnElement="Lane_Analista" isHorizontal="true">
+        <dc:Bounds x="130" y="360" width="1970" height="170" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Shape_Lane_Coord" bpmnElement="Lane_Coord" isHorizontal="true">
+        <dc:Bounds x="130" y="530" width="1970" height="170" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Shape_Lane_Emisor" bpmnElement="Lane_Emisor" isHorizontal="true">
+        <dc:Bounds x="130" y="700" width="1970" height="170" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Shape_Lane_Sup" bpmnElement="Lane_Sup" isHorizontal="true">
+        <dc:Bounds x="130" y="870" width="1970" height="260" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Shape_S_Caso" bpmnElement="S_Caso">
+        <dc:Bounds x="200" y="202" width="36" height="36" />
+        <bpmndi:BPMNLabel><dc:Bounds x="180" y="245" width="80" height="27" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Shape_T_SolicAnalisis" bpmnElement="T_SolicAnalisis">
+        <dc:Bounds x="280" y="180" width="130" height="80" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Shape_T_SolicCoord" bpmnElement="T_SolicCoord">
+        <dc:Bounds x="660" y="180" width="130" height="80" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Shape_GW_Disp" bpmnElement="GW_Disp" isMarkerVisible="true">
+        <dc:Bounds x="1030" y="195" width="50" height="50" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1005" y="150" width="100" height="27" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Shape_T_Verificar" bpmnElement="T_Verificar">
+        <dc:Bounds x="1120" y="180" width="130" height="80" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Shape_GW_Vigente" bpmnElement="GW_Vigente" isMarkerVisible="true">
+        <dc:Bounds x="1290" y="195" width="50" height="50" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1270" y="150" width="90" height="27" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Shape_T_SolicEmision" bpmnElement="T_SolicEmision">
+        <dc:Bounds x="1380" y="180" width="130" height="80" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Shape_T_NotificarCuad" bpmnElement="T_NotificarCuad">
+        <dc:Bounds x="1770" y="180" width="140" height="80" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Shape_E_Despachada" bpmnElement="E_Despachada">
+        <dc:Bounds x="1960" y="202" width="36" height="36" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1925" y="245" width="115" height="27" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Shape_E_Cerrado" bpmnElement="E_Cerrado">
+        <dc:Bounds x="1297" y="290" width="36" height="36" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1255" y="333" width="120" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Shape_T_Ana_Recibir" bpmnElement="T_Ana_Recibir">
+        <dc:Bounds x="280" y="405" width="130" height="80" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Shape_T_Ana_Procesar" bpmnElement="T_Ana_Procesar">
+        <dc:Bounds x="430" y="405" width="130" height="80" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Shape_T_Ana_Enviar" bpmnElement="T_Ana_Enviar">
+        <dc:Bounds x="580" y="405" width="130" height="80" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Shape_T_Coord_Recibir" bpmnElement="T_Coord_Recibir">
+        <dc:Bounds x="660" y="575" width="130" height="80" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Shape_T_Coord_Procesar" bpmnElement="T_Coord_Procesar">
+        <dc:Bounds x="810" y="575" width="130" height="80" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Shape_T_Coord_Enviar" bpmnElement="T_Coord_Enviar">
+        <dc:Bounds x="960" y="575" width="130" height="80" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Shape_T_Emisor_Recibir" bpmnElement="T_Emisor_Recibir">
+        <dc:Bounds x="1380" y="745" width="130" height="80" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Shape_T_Emisor_Procesar" bpmnElement="T_Emisor_Procesar">
+        <dc:Bounds x="1530" y="745" width="130" height="80" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Shape_T_Emisor_Enviar" bpmnElement="T_Emisor_Enviar">
+        <dc:Bounds x="1680" y="745" width="130" height="80" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Shape_SP_Contingencia" bpmnElement="SP_Contingencia" isExpanded="false">
+        <dc:Bounds x="1000" y="955" width="130" height="80" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Shape_E_Pendiente" bpmnElement="E_Pendiente">
+        <dc:Bounds x="1180" y="977" width="36" height="36" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1140" y="1020" width="120" height="27" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Shape_DS_Avisos" bpmnElement="DS_Avisos">
+        <dc:Bounds x="470" y="1160" width="50" height="50" />
+        <bpmndi:BPMNLabel><dc:Bounds x="445" y="1215" width="105" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Shape_DS_Cuadrillas" bpmnElement="DS_Cuadrillas">
+        <dc:Bounds x="850" y="1160" width="50" height="50" />
+        <bpmndi:BPMNLabel><dc:Bounds x="800" y="1215" width="150" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Shape_DS_Ordenes" bpmnElement="DS_Ordenes">
+        <dc:Bounds x="1570" y="1160" width="50" height="50" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1540" y="1215" width="120" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNEdge id="Edge_F01" bpmnElement="F01"><di:waypoint x="236" y="220" /><di:waypoint x="280" y="220" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_F02" bpmnElement="F02"><di:waypoint x="345" y="260" /><di:waypoint x="345" y="405" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_F03" bpmnElement="F03"><di:waypoint x="410" y="445" /><di:waypoint x="430" y="445" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_F04" bpmnElement="F04"><di:waypoint x="560" y="445" /><di:waypoint x="580" y="445" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_F05" bpmnElement="F05"><di:waypoint x="645" y="405" /><di:waypoint x="645" y="290" /><di:waypoint x="725" y="290" /><di:waypoint x="725" y="260" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_F06" bpmnElement="F06"><di:waypoint x="725" y="260" /><di:waypoint x="725" y="575" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_F07" bpmnElement="F07"><di:waypoint x="790" y="615" /><di:waypoint x="810" y="615" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_F08" bpmnElement="F08"><di:waypoint x="940" y="615" /><di:waypoint x="960" y="615" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_F09" bpmnElement="F09"><di:waypoint x="1025" y="575" /><di:waypoint x="1025" y="400" /><di:waypoint x="1055" y="400" /><di:waypoint x="1055" y="245" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_F10" bpmnElement="F10"><di:waypoint x="1080" y="220" /><di:waypoint x="1120" y="220" /><bpmndi:BPMNLabel><dc:Bounds x="1090" y="202" width="15" height="14" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_F11" bpmnElement="F11"><di:waypoint x="1250" y="220" /><di:waypoint x="1290" y="220" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_F12" bpmnElement="F12"><di:waypoint x="1340" y="220" /><di:waypoint x="1380" y="220" /><bpmndi:BPMNLabel><dc:Bounds x="1350" y="202" width="15" height="14" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_F13" bpmnElement="F13"><di:waypoint x="1445" y="260" /><di:waypoint x="1445" y="745" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_F14" bpmnElement="F14"><di:waypoint x="1510" y="785" /><di:waypoint x="1530" y="785" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_F15" bpmnElement="F15"><di:waypoint x="1660" y="785" /><di:waypoint x="1680" y="785" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_F16" bpmnElement="F16"><di:waypoint x="1745" y="745" /><di:waypoint x="1745" y="300" /><di:waypoint x="1835" y="300" /><di:waypoint x="1835" y="260" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_F17" bpmnElement="F17"><di:waypoint x="1910" y="220" /><di:waypoint x="1960" y="220" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_F20" bpmnElement="F20"><di:waypoint x="1055" y="245" /><di:waypoint x="1055" y="955" /><bpmndi:BPMNLabel><dc:Bounds x="1060" y="500" width="130" height="27" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_F21" bpmnElement="F21"><di:waypoint x="1315" y="245" /><di:waypoint x="1315" y="290" /><bpmndi:BPMNLabel><dc:Bounds x="1320" y="255" width="100" height="14" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_F22" bpmnElement="F22"><di:waypoint x="1130" y="995" /><di:waypoint x="1180" y="995" /></bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="Edge_DIA_Ana" bpmnElement="DIA_Ana"><di:waypoint x="495" y="1160" /><di:waypoint x="495" y="485" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_DIA_Coord" bpmnElement="DIA_Coord"><di:waypoint x="875" y="1160" /><di:waypoint x="875" y="655" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_DIA_Ver" bpmnElement="DIA_Ver"><di:waypoint x="520" y="1185" /><di:waypoint x="1185" y="1185" /><di:waypoint x="1185" y="260" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_DOA_Em" bpmnElement="DOA_Em"><di:waypoint x="1595" y="825" /><di:waypoint x="1595" y="1160" /></bpmndi:BPMNEdge>
+
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+
+</bpmn:definitions>

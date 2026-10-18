@@ -1,0 +1,181 @@
+[
+  {
+    "id": "GOLDEN-01",
+    "nombre": "Caso normal con cuadrilla disponible en la misma zona",
+    "entrada": {
+      "codigo_aviso": "AV-GOLDEN-001",
+      "zona": "Porvenir Norte",
+      "tipo_falla": "baja_tension",
+      "prioridad": "normal"
+    },
+    "avisos_mock": [
+      {
+        "codigo_aviso": "AV-GOLDEN-001",
+        "zona": "Porvenir Norte",
+        "direccion": "Mz A Lt 5",
+        "tipo_falla": "baja_tension",
+        "prioridad": "normal",
+        "descripcion": "Falta de suministro en la zona",
+        "estado": "en_cola"
+      }
+    ],
+    "cuadrillas_mock": [
+      {
+        "codigo_cuadrilla": "CU-GOLDEN-01",
+        "nombre": "Cuadrilla Porvenir",
+        "zona_base": "Porvenir Norte",
+        "especialidad": "baja_tension",
+        "estado": "libre"
+      }
+    ],
+    "estado_actual_aviso": "en_cola",
+    "esperado": {
+      "resultado": "cuadrilla_despachada",
+      "cuadrilla": "CU-GOLDEN-01",
+      "notificacion_enviada": true
+    }
+  },
+  {
+    "id": "GOLDEN-02",
+    "nombre": "Caso prioritario de transformador con cuadrilla especializada",
+    "entrada": {
+      "codigo_aviso": "AV-GOLDEN-002",
+      "zona": "Trujillo Centro",
+      "tipo_falla": "transformador",
+      "prioridad": "alta"
+    },
+    "avisos_mock": [
+      {
+        "codigo_aviso": "AV-GOLDEN-002",
+        "zona": "Trujillo Centro",
+        "direccion": "Av. Principal 500",
+        "tipo_falla": "transformador",
+        "prioridad": "alta",
+        "descripcion": "Hospital sin suministro eléctrico",
+        "estado": "en_cola"
+      }
+    ],
+    "cuadrillas_mock": [
+      {
+        "codigo_cuadrilla": "CU-GOLDEN-02",
+        "nombre": "Cuadrilla Transformadores",
+        "zona_base": "Trujillo Centro",
+        "especialidad": "transformador",
+        "estado": "libre"
+      }
+    ],
+    "estado_actual_aviso": "en_cola",
+    "esperado": {
+      "resultado": "cuadrilla_despachada",
+      "cuadrilla": "CU-GOLDEN-02",
+      "notificacion_enviada": true
+    }
+  },
+  {
+    "id": "GOLDEN-03",
+    "nombre": "Caso sin cuadrilla disponible",
+    "entrada": {
+      "codigo_aviso": "AV-GOLDEN-003",
+      "zona": "Laredo",
+      "tipo_falla": "media_tension",
+      "prioridad": "normal"
+    },
+    "avisos_mock": [
+      {
+        "codigo_aviso": "AV-GOLDEN-003",
+        "zona": "Laredo",
+        "direccion": "Av. Principal 890",
+        "tipo_falla": "media_tension",
+        "prioridad": "normal",
+        "descripcion": "Sector completo sin suministro",
+        "estado": "en_cola"
+      }
+    ],
+    "cuadrillas_mock": [],
+    "estado_actual_aviso": "en_cola",
+    "esperado": {
+      "resultado": "sin_cuadrilla",
+      "cuadrilla": null,
+      "notificacion_enviada": false
+    }
+  },
+  {
+    "id": "GOLDEN-04",
+    "nombre": "Caso cancelado antes de emitir la orden",
+    "entrada": {
+      "codigo_aviso": "AV-GOLDEN-004",
+      "zona": "Porvenir Norte",
+      "tipo_falla": "baja_tension",
+      "prioridad": "normal"
+    },
+    "avisos_mock": [
+      {
+        "codigo_aviso": "AV-GOLDEN-004",
+        "zona": "Porvenir Norte",
+        "direccion": "Mz B Lt 10",
+        "tipo_falla": "baja_tension",
+        "prioridad": "normal",
+        "descripcion": "Aviso posteriormente cancelado",
+        "estado": "en_cola"
+      }
+    ],
+    "cuadrillas_mock": [
+      {
+        "codigo_cuadrilla": "CU-GOLDEN-04",
+        "nombre": "Cuadrilla Porvenir",
+        "zona_base": "Porvenir Norte",
+        "especialidad": "baja_tension",
+        "estado": "libre"
+      }
+    ],
+    "estado_actual_aviso": "cancelado",
+    "esperado": {
+      "resultado": "caso_cancelado",
+      "cuadrilla": null,
+      "notificacion_enviada": false
+    }
+  },
+  {
+    "id": "GOLDEN-05",
+    "nombre": "Varias cuadrillas válidas con prioridad por misma zona",
+    "entrada": {
+      "codigo_aviso": "AV-GOLDEN-005",
+      "zona": "Porvenir Norte",
+      "tipo_falla": "baja_tension",
+      "prioridad": "normal"
+    },
+    "avisos_mock": [
+      {
+        "codigo_aviso": "AV-GOLDEN-005",
+        "zona": "Porvenir Norte",
+        "direccion": "Mz D Lt 8",
+        "tipo_falla": "baja_tension",
+        "prioridad": "normal",
+        "descripcion": "Falta de suministro desde la mañana",
+        "estado": "en_cola"
+      }
+    ],
+    "cuadrillas_mock": [
+      {
+        "codigo_cuadrilla": "CU-CENTRO",
+        "nombre": "Cuadrilla Centro",
+        "zona_base": "Trujillo Centro",
+        "especialidad": "baja_tension",
+        "estado": "libre"
+      },
+      {
+        "codigo_cuadrilla": "CU-PORVENIR",
+        "nombre": "Cuadrilla Porvenir",
+        "zona_base": "Porvenir Norte",
+        "especialidad": "baja_tension",
+        "estado": "libre"
+      }
+    ],
+    "estado_actual_aviso": "en_cola",
+    "esperado": {
+      "resultado": "cuadrilla_despachada",
+      "cuadrilla": "CU-PORVENIR",
+      "notificacion_enviada": true
+    }
+  }
+]
