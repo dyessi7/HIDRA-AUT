@@ -12,6 +12,7 @@ from __future__ import annotations
 import logging
 
 from langchain_core.output_parsers import PydanticOutputParser
+from langchain_core.prompts import ChatPromptTemplate
 from pydantic import BaseModel
 
 from graph.llm import get_llm
@@ -51,12 +52,13 @@ def _tipo_predominante_deterministico(
 )
 
 
+
 def _analizar_con_llm(
     avisos: list[Aviso],
     zona: str,
     codigo_actual: str,
 ) -> AnalisisFallaLLM | None:
-    """Analiza los avisos mediante el LLM con salida estructurada."""
+    """Analiza los avisos mediante LCEL con salida estructurada."""
 
     if not avisos:
         return None
@@ -73,7 +75,8 @@ def _analizar_con_llm(
         for aviso in avisos
     )
 
-    prompt = f"""
+    prompt = ChatPromptTemplate.from_template(
+        """
 Eres el AnalistaDeFalla de un sistema de despacho de incidencias eléctricas.
 
 Analiza los avisos abiertos de la zona "{zona}" y determina cuáles podrían
@@ -91,17 +94,21 @@ Reglas:
 Avisos disponibles:
 {detalle_avisos}
 
-{parser.get_format_instructions()}
+{formato}
 """
+    )
+
+    chain = prompt | get_llm() | parser
 
     try:
-        respuesta = get_llm().invoke(prompt)
-
-        contenido = respuesta.content
-        if not isinstance(contenido, str):
-            contenido = str(contenido)
-
-        resultado = parser.parse(contenido)
+        resultado = chain.invoke(
+            {
+                "zona": zona,
+                "codigo_actual": codigo_actual,
+                "detalle_avisos": detalle_avisos,
+                "formato": parser.get_format_instructions(),
+            }
+        )
 
         codigos_validos = {aviso.codigo_aviso for aviso in avisos}
 

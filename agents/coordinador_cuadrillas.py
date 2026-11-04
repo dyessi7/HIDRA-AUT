@@ -13,6 +13,7 @@ from __future__ import annotations
 import logging
 
 from langchain_core.output_parsers import PydanticOutputParser
+from langchain_core.prompts import ChatPromptTemplate
 from pydantic import BaseModel
 
 from graph.llm import get_llm
@@ -51,13 +52,14 @@ def _rankear(
     return misma_zona + otras
 
 
+
 def _recomendar_con_llm(
     candidatas: list[Cuadrilla],
     zona: str,
     especialidad: str,
     prioridad: str,
 ) -> RecomendacionCuadrillaLLM | None:
-    """Solicita al LLM elegir únicamente entre candidatas válidas."""
+    """Recomienda una cuadrilla mediante LCEL con salida estructurada."""
 
     if not candidatas:
         return None
@@ -77,7 +79,8 @@ def _recomendar_con_llm(
         for cuadrilla in candidatas
     )
 
-    prompt = f"""
+    prompt = ChatPromptTemplate.from_template(
+        """
 Eres el CoordinadorDeCuadrillas de un sistema de despacho de
 incidencias eléctricas.
 
@@ -100,17 +103,22 @@ Reglas obligatorias:
 Candidatas válidas:
 {detalle_candidatas}
 
-{parser.get_format_instructions()}
+{formato}
 """
+    )
+
+    chain = prompt | get_llm() | parser
 
     try:
-        respuesta = get_llm().invoke(prompt)
-
-        contenido = respuesta.content
-        if not isinstance(contenido, str):
-            contenido = str(contenido)
-
-        resultado = parser.parse(contenido)
+        resultado = chain.invoke(
+            {
+                "zona": zona,
+                "especialidad": especialidad,
+                "prioridad": prioridad,
+                "detalle_candidatas": detalle_candidatas,
+                "formato": parser.get_format_instructions(),
+            }
+        )
 
         codigos_validos = {
             cuadrilla.codigo_cuadrilla
