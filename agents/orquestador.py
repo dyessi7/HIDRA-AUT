@@ -1,13 +1,13 @@
-"""Orquestador del ciclo de despacho.
+﻿"""Orquestador del ciclo de despacho.
 
-No es un agente con razonamiento propio: es la lógica de coordinación que
-decide a quién llamar cuando, verifica vigencia del caso antes de emitir,
-notifica la orden a la cuadrilla y rutea el resultado a cuadrilla despachada,
-caso cerrado o alerta al supervisor.
+Responsabilidad principal: coordinar la ejecuciÃƒÂ³n del proceso de despacho,
+controlar las decisiones del flujo y dirigir el caso segÃƒÂºn su resultado.
 
-El razonamiento vive en los subagentes. El orquestador asegura que las
-invariantes del CLAUDE.md se cumplan (vigencia, disponibilidad, no emisión
-sin verificación).
+Verifica la vigencia del aviso antes de emitir la orden, coordina la notificaciÃƒÂ³n
+a la cuadrilla y gestiona las rutas alternativas cuando el caso ha sido cancelado o no existe una cuadrilla disponible.
+
+El razonamiento especializado se encuentra en los subagentes. El orquestador se encarga de mantener el cumplimiento de
+las reglas del proceso, como verificar la vigencia del caso antes de emitir una orden.
 """
 
 from __future__ import annotations
@@ -26,7 +26,7 @@ def verificar_vigencia(estado: EstadoDespacho) -> EstadoDespacho:
     """Consulta el estado actual del aviso antes de emitir orden.
 
     Si fue cancelado entre la entrada a la cola y este momento,
-    se aborta la emisión.
+    se aborta la emisiÃƒÂ³n.
     """
 
     codigo = estado["codigo_aviso"]
@@ -36,7 +36,7 @@ def verificar_vigencia(estado: EstadoDespacho) -> EstadoDespacho:
 
     if not vigente:
         logger.warning(
-            "Caso %s no vigente (estado=%s), se abortará emisión",
+            "Caso %s no vigente (estado=%s), se abortarÃƒÂ¡ emisiÃƒÂ³n",
             codigo,
             estado_actual,
         )
@@ -50,8 +50,8 @@ def verificar_vigencia(estado: EstadoDespacho) -> EstadoDespacho:
 def notificar_cuadrilla(estado: EstadoDespacho) -> EstadoDespacho:
     """Notifica digitalmente la orden a la cuadrilla asignada.
 
-    Esta actividad representa el envío digital de la orden.
-    No representa la confirmación de recepción de la cuadrilla,
+    Esta actividad representa el envÃƒÂ­o digital de la orden.
+    No representa la confirmaciÃƒÂ³n de recepciÃƒÂ³n de la cuadrilla,
     ya que esa actividad queda fuera del alcance actual.
     """
 
@@ -120,8 +120,8 @@ def resolver_caso_cancelado(
     """Resultado terminal cuando el caso fue cancelado antes de emitir."""
 
     mensaje = (
-        f"Caso {estado['codigo_aviso']} cerrado por cancelación del cliente. "
-        "No se emitió orden. No se consumió recurso de cuadrilla."
+        f"Caso {estado['codigo_aviso']} cerrado por cancelaciÃƒÂ³n del cliente. "
+        "No se emitiÃƒÂ³ orden. No se consumiÃƒÂ³ recurso de cuadrilla."
     )
 
     logger.info(
@@ -139,7 +139,7 @@ def resolver_caso_cancelado(
 def ruta_tras_coordinacion(
     estado: EstadoDespacho,
 ) -> str:
-    """Routing condicional: ¿hay cuadrilla recomendada?"""
+    """Routing condicional: Ã‚Â¿hay cuadrilla recomendada?"""
 
     if estado.get("cuadrilla_recomendada") is None:
         return "sin_cuadrilla"
@@ -150,7 +150,7 @@ def ruta_tras_coordinacion(
 def ruta_tras_verificacion(
     estado: EstadoDespacho,
 ) -> str:
-    """Routing condicional: ¿el caso sigue vigente?"""
+    """Routing condicional: Ã‚Â¿el caso sigue vigente?"""
 
     if estado.get("caso_sigue_vigente"):
         return "emitir"
